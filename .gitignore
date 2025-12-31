@@ -1,0 +1,17 @@
+node_modules
+.prettierrc
+controllers/tourController
+controllers/userController
+models/tourModel
+models/userModel
+routes/tourRoutes
+routes/userRoutes
+dev-data/
+config.env
+key-cistern-389009-e8c97d3cec5a.json
+public/*.mp3
+public2
+routes/uploads
+build2/
+xyz.png
+ConvertData/
