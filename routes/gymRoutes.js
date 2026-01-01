@@ -78,7 +78,6 @@ const router = express.Router();
 // ============================
 // MULTER CONFIGURATION - CHANGED TO MEMORY STORAGE
 // ============================
-// שינוי: שימוש ב-memoryStorage כדי לקבל את ה-Buffer ב-Controller
 const storage = multer.memoryStorage();
 
 const upload = multer({ storage });
@@ -87,13 +86,10 @@ const upload = multer({ storage });
 // ROUTES
 // ============================
 
-// נתיב להעלאת תמונה
 router.post("/upload-image", upload.single("image"), uploadGymImage);
 
-// נתיב להחזרת תמונה לפי ID
 router.get("/image/:id", getImageByID);
 
-// שאר הנתיבים הקיימים
 router.route("/deleteAll").delete(deleteAllGyms);
 router.route("/:id").get(getGym).patch(updateGym).delete(deleteGym);
 router.route("/").get(getAllGyms).post(createGym);
