@@ -1,3 +1,8 @@
+// const express = require("express");
+// const multer = require("multer"); // ייבוא multer
+// const path = require("path");
+// const fs = require("fs");
+
 // const {
 //   getAllGyms,
 //   getGym,
@@ -6,21 +11,56 @@
 //   updateGym,
 //   deleteGym,
 //   deleteAllGyms,
+//   uploadGymImage, // הפונקציה החדשה שנוסיף ב-Controller
+//   getImageByID,
 // } = require("../controllers/gymController");
-// const express = require("express");
+
 // const router = express.Router();
+
+// // ============================
+// // MULTER CONFIGURATION
+// // ============================
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     // נתיב השמירה: public/uploads
+//     const dir = path.join(__dirname, "../public/uploads");
+
+//     // בדיקה אם התיקייה קיימת, ואם לא - ליצור אותה
+//     if (!fs.existsSync(dir)) {
+//       fs.mkdirSync(dir, { recursive: true });
+//     }
+
+//     cb(null, dir);
+//   },
+//   filename: (req, file, cb) => {
+//     // שימוש בשם המקורי של הקובץ
+//     cb(null, file.originalname);
+//   },
+// });
+
+// const upload = multer({ storage });
+
+// // ============================
+// // ROUTES
+// // ============================
+
+// // נתיב להעלאת תמונה
+// // מקבל שדה בשם 'image' (כמו בפרויקט הקודם שלך)
+// router.post("/upload-image", upload.single("image"), uploadGymImage);
+
+// // נתיב להחזרת תמונה לפי ID
+// router.get("/image/:id", getImageByID);
+
+// // שאר הנתיבים הקיימים
 // router.route("/deleteAll").delete(deleteAllGyms);
 // router.route("/:id").get(getGym).patch(updateGym).delete(deleteGym);
 // router.route("/").get(getAllGyms).post(createGym);
 // router.route("/insertMany/data").post(insertAllGyms);
+
 // module.exports = router;
 
-// routes/gymRoutes.js
 const express = require("express");
-const multer = require("multer"); // ייבוא multer
-const path = require("path");
-const fs = require("fs");
-
+const multer = require("multer");
 const {
   getAllGyms,
   getGym,
@@ -29,32 +69,17 @@ const {
   updateGym,
   deleteGym,
   deleteAllGyms,
-  uploadGymImage, // הפונקציה החדשה שנוסיף ב-Controller
+  uploadGymImage,
   getImageByID,
 } = require("../controllers/gymController");
 
 const router = express.Router();
 
 // ============================
-// MULTER CONFIGURATION
+// MULTER CONFIGURATION - CHANGED TO MEMORY STORAGE
 // ============================
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // נתיב השמירה: public/uploads
-    const dir = path.join(__dirname, "../public/uploads");
-
-    // בדיקה אם התיקייה קיימת, ואם לא - ליצור אותה
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    // שימוש בשם המקורי של הקובץ
-    cb(null, file.originalname);
-  },
-});
+// שינוי: שימוש ב-memoryStorage כדי לקבל את ה-Buffer ב-Controller
+const storage = multer.memoryStorage();
 
 const upload = multer({ storage });
 
@@ -63,7 +88,6 @@ const upload = multer({ storage });
 // ============================
 
 // נתיב להעלאת תמונה
-// מקבל שדה בשם 'image' (כמו בפרויקט הקודם שלך)
 router.post("/upload-image", upload.single("image"), uploadGymImage);
 
 // נתיב להחזרת תמונה לפי ID

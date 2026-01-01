@@ -1,14 +1,12 @@
-const fs = require("fs");
-const path = require("path");
 const Gym = require("../models/gymModel");
+const Image = require("../models/imageModel"); // ייבוא המודל החדש
 const catchAsync = require("../utils/catchAsync");
 const APIfeatures = require("../utils/apiFeatures");
 
 // ========================
-// UPLOAD IMAGE HANDLER
+// UPLOAD IMAGE HANDLER (MONGO VERSION)
 // ========================
 exports.uploadGymImage = catchAsync(async (req, res, next) => {
-  // אם אין קובץ, נחזיר שגיאה (אופציונלי להשתמש ב-AppError שלך)
   if (!req.file) {
     return res.status(400).json({
       status: "fail",
@@ -16,45 +14,121 @@ exports.uploadGymImage = catchAsync(async (req, res, next) => {
     });
   }
 
-  // שמירת הנתיב היחסי כדי לשמור ב-DB או להחזיר ללקוח
-  // למשל: /uploads/gym-123456.jpg
-  const relativePath = `/uploads/${req.file.filename}`;
+  // יצירת שם קובץ (בדיוק כמו שהיה ב-diskStorage - השם המקורי)
+  const filename = req.file.originalname;
 
-  console.log("Image saved at:", req.file.path);
+  // שמירה ב-MongoDB
+  // אנחנו בודקים אם קיימת תמונה עם שם זהה ומעדכנים אותה, או יוצרים חדשה
+  // זה מונע כפילויות אם מעלים שוב לאותו משתמש
+  const newImage = await Image.findOneAndUpdate(
+    { filename: filename },
+    {
+      filename: filename,
+      contentType: req.file.mimetype,
+      data: req.file.buffer, // המידע הבינארי של התמונה
+    },
+    { upsert: true, new: true }
+  );
+
+  // שמירת הנתיב היחסי (וירטואלי) כדי להחזיר ללקוח בדיוק את מה שהוא מצפה לקבל
+  // הצד לקוח ישתמש בנתיב הזה, שיפנה ל-endpoint שלנו: getImageByID
+  const relativePath = `/uploads/${filename}`;
+
+  console.log("Image saved to MongoDB:", filename);
 
   res.status(200).json({
     status: "success",
     message: "Image uploaded successfully",
     data: {
-      filePath: relativePath, // הנתיב שבו התמונה נשמרה
-      fileName: req.file.filename,
+      filePath: relativePath,
+      fileName: filename,
     },
   });
 });
 
 // ========================
-// GET IMAGE BY ID
+// GET IMAGE BY ID (MONGO VERSION)
 // ========================
 exports.getImageByID = catchAsync(async (req, res, next) => {
   const imageId = req.params.id;
-  const uploadsDir = path.join(__dirname, "../public/uploads");
 
-  // חיפוש קובץ שמתחיל ב-ID (למשל 315774000.png)
-  const files = fs.readdirSync(uploadsDir);
-  const imageFile = files.find((file) => file.startsWith(imageId));
+  // לוגיקה זהה למה שהיה ב-FS: חיפוש קובץ שמתחיל ב-ID
+  // אנחנו משתמשים ב-Regex כדי לחקות את ההתנהגות של files.find(file => file.startsWith(imageId))
+  const image = await Image.findOne({
+    filename: { $regex: new RegExp(`^${imageId}`) },
+  });
 
-  if (!imageFile) {
+  if (!image) {
     return res.status(404).json({
       status: "fail",
       message: "Image not found",
     });
   }
 
-  const imagePath = path.join(uploadsDir, imageFile);
+  // הגדרת סוג התוכן (למשל image/png)
+  res.set("Content-Type", image.contentType);
 
-  // שליחת הקובץ
-  res.sendFile(imagePath);
+  // שליחת ה-Buffer ישירות לדפדפן
+  res.send(image.data);
 });
+
+// const fs = require("fs");
+// const path = require("path");
+// const Gym = require("../models/gymModel");
+// const catchAsync = require("../utils/catchAsync");
+// const APIfeatures = require("../utils/apiFeatures");
+
+// // ========================
+// // UPLOAD IMAGE HANDLER
+// // ========================
+// exports.uploadGymImage = catchAsync(async (req, res, next) => {
+//   // אם אין קובץ, נחזיר שגיאה (אופציונלי להשתמש ב-AppError שלך)
+//   if (!req.file) {
+//     return res.status(400).json({
+//       status: "fail",
+//       message: "No image uploaded",
+//     });
+//   }
+
+//   // שמירת הנתיב היחסי כדי לשמור ב-DB או להחזיר ללקוח
+//   // למשל: /uploads/gym-123456.jpg
+//   const relativePath = `/uploads/${req.file.filename}`;
+
+//   console.log("Image saved at:", req.file.path);
+
+//   res.status(200).json({
+//     status: "success",
+//     message: "Image uploaded successfully",
+//     data: {
+//       filePath: relativePath, // הנתיב שבו התמונה נשמרה
+//       fileName: req.file.filename,
+//     },
+//   });
+// });
+
+// // ========================
+// // GET IMAGE BY ID
+// // ========================
+// exports.getImageByID = catchAsync(async (req, res, next) => {
+//   const imageId = req.params.id;
+//   const uploadsDir = path.join(__dirname, "../public/uploads");
+
+//   // חיפוש קובץ שמתחיל ב-ID (למשל 315774000.png)
+//   const files = fs.readdirSync(uploadsDir);
+//   const imageFile = files.find((file) => file.startsWith(imageId));
+
+//   if (!imageFile) {
+//     return res.status(404).json({
+//       status: "fail",
+//       message: "Image not found",
+//     });
+//   }
+
+//   const imagePath = path.join(uploadsDir, imageFile);
+
+//   // שליחת הקובץ
+//   res.sendFile(imagePath);
+// });
 
 //------------------------
 // GET ALL GYMS
