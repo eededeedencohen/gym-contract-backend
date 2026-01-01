@@ -1,4 +1,5 @@
 const fs = require("fs");
+const path = require("path");
 const Gym = require("../models/gymModel");
 const catchAsync = require("../utils/catchAsync");
 const APIfeatures = require("../utils/apiFeatures");
@@ -29,6 +30,30 @@ exports.uploadGymImage = catchAsync(async (req, res, next) => {
       fileName: req.file.filename,
     },
   });
+});
+
+// ========================
+// GET IMAGE BY ID
+// ========================
+exports.getImageByID = catchAsync(async (req, res, next) => {
+  const imageId = req.params.id;
+  const uploadsDir = path.join(__dirname, "../public/uploads");
+
+  // חיפוש קובץ שמתחיל ב-ID (למשל 315774000.png)
+  const files = fs.readdirSync(uploadsDir);
+  const imageFile = files.find((file) => file.startsWith(imageId));
+
+  if (!imageFile) {
+    return res.status(404).json({
+      status: "fail",
+      message: "Image not found",
+    });
+  }
+
+  const imagePath = path.join(uploadsDir, imageFile);
+
+  // שליחת הקובץ
+  res.sendFile(imagePath);
 });
 
 //------------------------

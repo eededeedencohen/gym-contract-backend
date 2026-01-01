@@ -30,6 +30,7 @@ const {
   deleteGym,
   deleteAllGyms,
   uploadGymImage, // הפונקציה החדשה שנוסיף ב-Controller
+  getImageByID,
 } = require("../controllers/gymController");
 
 const router = express.Router();
@@ -64,6 +65,9 @@ const upload = multer({ storage });
 // נתיב להעלאת תמונה
 // מקבל שדה בשם 'image' (כמו בפרויקט הקודם שלך)
 router.post("/upload-image", upload.single("image"), uploadGymImage);
+
+// נתיב להחזרת תמונה לפי ID
+router.get("/image/:id", getImageByID);
 
 // שאר הנתיבים הקיימים
 router.route("/deleteAll").delete(deleteAllGyms);
