@@ -3,6 +3,34 @@ const Gym = require("../models/gymModel");
 const catchAsync = require("../utils/catchAsync");
 const APIfeatures = require("../utils/apiFeatures");
 
+// ========================
+// UPLOAD IMAGE HANDLER
+// ========================
+exports.uploadGymImage = catchAsync(async (req, res, next) => {
+  // אם אין קובץ, נחזיר שגיאה (אופציונלי להשתמש ב-AppError שלך)
+  if (!req.file) {
+    return res.status(400).json({
+      status: "fail",
+      message: "No image uploaded",
+    });
+  }
+
+  // שמירת הנתיב היחסי כדי לשמור ב-DB או להחזיר ללקוח
+  // למשל: /uploads/gym-123456.jpg
+  const relativePath = `/uploads/${req.file.filename}`;
+
+  console.log("Image saved at:", req.file.path);
+
+  res.status(200).json({
+    status: "success",
+    message: "Image uploaded successfully",
+    data: {
+      filePath: relativePath, // הנתיב שבו התמונה נשמרה
+      fileName: req.file.filename,
+    },
+  });
+});
+
 //------------------------
 // GET ALL GYMS
 //------------------------
