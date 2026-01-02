@@ -219,12 +219,19 @@ exports.updateGym = catchAsync(async (req, res, next) => {
 exports.deleteGym = catchAsync(async (req, res, next) => {
   // תיקון: מחיקה לפי memberID
   const gym = await Gym.findOneAndDelete({ memberID: req.params.id });
+  const image = await Image.findOneAndDelete({
+    filename: { $regex: new RegExp(`^${req.params.id}`) },
+  });
 
   if (!gym) {
     return res.status(404).json({
       status: "fail",
       message: "No gym found with that ID",
     });
+  }
+
+  if (!image) {
+    console.warn("No image found to delete for gym ID:", req.params.id);
   }
 
   res.status(204).json({
@@ -254,6 +261,7 @@ exports.insertAllGyms = catchAsync(async (req, res, next) => {
 //-------------------------------------------------
 exports.deleteAllGyms = catchAsync(async (req, res, next) => {
   await Gym.deleteMany();
+  await Image.deleteMany();
 
   res.status(204).json({
     status: "success",
