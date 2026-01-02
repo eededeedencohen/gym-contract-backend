@@ -58,9 +58,48 @@
 // router.route("/insertMany/data").post(insertAllGyms);
 
 // module.exports = router;
+//=====================================================
+// const express = require("express");
+// const multer = require("multer");
+// const {
+//   getAllGyms,
+//   getGym,
+//   createGym,
+//   insertAllGyms,
+//   updateGym,
+//   deleteGym,
+//   deleteAllGyms,
+//   uploadGymImage,
+//   getImageByID,
+// } = require("../controllers/gymController");
+
+// const router = express.Router();
+
+// // ============================
+// // MULTER CONFIGURATION - CHANGED TO MEMORY STORAGE
+// // ============================
+// const storage = multer.memoryStorage();
+
+// const upload = multer({ storage });
+
+// // ============================
+// // ROUTES
+// // ============================
+
+// router.post("/upload-image", upload.single("image"), uploadGymImage);
+
+// router.get("/image/:id", getImageByID);
+
+// router.route("/deleteAll").delete(deleteAllGyms);
+// router.route("/:id").get(getGym).patch(updateGym).delete(deleteGym);
+// router.route("/").get(getAllGyms).post(createGym);
+// router.route("/insertMany/data").post(insertAllGyms);
+
+// module.exports = router;
 
 const express = require("express");
 const multer = require("multer");
+const authController = require("../controllers/authController"); // 1. הייבוא של האבטחה
 const {
   getAllGyms,
   getGym,
@@ -76,23 +115,45 @@ const {
 const router = express.Router();
 
 // ============================
-// MULTER CONFIGURATION - CHANGED TO MEMORY STORAGE
+// MULTER CONFIGURATION
 // ============================
 const storage = multer.memoryStorage();
-
 const upload = multer({ storage });
 
 // ============================
-// ROUTES
+// 1. PUBLIC ROUTES (פתוח לכולם)
 // ============================
 
+// נתיב התחברות למנהל (כדי שתוכל לקבל את הטוקן)
+router.post("/login", authController.login);
+
+// שליחת הטופס - חייב להיות פתוח ללקוח
+router.post("/", createGym);
+
+// העלאת תמונה/חתימה - חייב להיות פתוח כי זה חלק מהטופס של הלקוח
 router.post("/upload-image", upload.single("image"), uploadGymImage);
 
+// צפייה בתמונה - בדרך כלל משאירים פתוח כדי שיהיה קל להציג בדפדפן
 router.get("/image/:id", getImageByID);
 
+// ============================
+// 2. SECURITY MIDDLEWARE (מחסום)
+// ============================
+// כל נתיב שיוגדר מתחת לשורה הזו יחייב שליחת Token תקני
+router.use(authController.protect);
+
+// ============================
+// 3. PROTECTED ROUTES (רק למנהל)
+// ============================
+
+// קבלת כל החוזים (רק מנהל צריך לראות את הרשימה)
+router.get("/", getAllGyms);
+
+// פעולות מחיקה ועריכה מתקדמות
 router.route("/deleteAll").delete(deleteAllGyms);
-router.route("/:id").get(getGym).patch(updateGym).delete(deleteGym);
-router.route("/").get(getAllGyms).post(createGym);
 router.route("/insertMany/data").post(insertAllGyms);
+
+// פעולות על חוזה ספציפי (קריאה, עריכה, מחיקה)
+router.route("/:id").get(getGym).patch(updateGym).delete(deleteGym);
 
 module.exports = router;
