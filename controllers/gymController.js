@@ -269,6 +269,26 @@
 //   });
 // });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const fs = require("fs"); // הוספתי את זה כי אתה משתמש בזה ב-insertAllGyms
 const Gym = require("../models/gymModel");
 const Image = require("../models/imageModel");
