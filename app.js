@@ -49,7 +49,6 @@ const express = require("express");
 const morgan = require("morgan");
 const cors = require("cors");
 const productRouter = require("./routes/productRoutes");
-const gymMemberRouter = require("./routes/gymMemberRoutes");
 const gymRouter = require("./routes/gymRoutes");
 
 const app = express();
@@ -66,7 +65,6 @@ if (process.env.NODE_ENV === "development") {
 app.use(express.json({ limit: "50mb" }));
 
 app.use("/api/v1/products", productRouter);
-app.use("/api/v1/gym-members", gymMemberRouter);
 app.use("/api/v1/gyms", gymRouter);
 
 app.use(express.static("public"));
