@@ -414,20 +414,53 @@ exports.createGym = catchAsync(async (req, res, next) => {
 // UPDATE GYM
 //------------------------
 exports.updateGym = catchAsync(async (req, res, next) => {
-  const gym = await Gym.findOneAndUpdate(
-    { memberID: req.params.id },
-    req.body,
-    {
-      new: true,
-      runValidators: true,
+  const oldID = req.params.id;
+
+  // מאפשרים לעדכן רק שם ות.ז (לא שדות מערכת)
+  const updateData = {};
+  if (typeof req.body.memberName === "string") {
+    updateData.memberName = req.body.memberName.trim();
+  }
+  if (typeof req.body.memberID === "string") {
+    updateData.memberID = req.body.memberID.trim();
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return res.status(400).json({
+      status: "fail",
+      message: "No valid fields to update",
+    });
+  }
+
+  // אם משנים ת.ז - מוודאים שהחדשה לא תפוסה
+  if (updateData.memberID && updateData.memberID !== oldID) {
+    const exists = await Gym.findOne({ memberID: updateData.memberID });
+    if (exists) {
+      return res.status(400).json({
+        status: "fail",
+        message: "תעודת זהות זו כבר קיימת במערכת",
+      });
     }
-  );
+  }
+
+  const gym = await Gym.findOneAndUpdate({ memberID: oldID }, updateData, {
+    new: true,
+    runValidators: true,
+  });
 
   if (!gym) {
     return res.status(404).json({
       status: "fail",
       message: "No gym found with that ID",
     });
+  }
+
+  // אם ת.ז השתנתה - משנים גם את שם קובץ החתימה כדי שהקישור יישאר תקין
+  if (updateData.memberID && updateData.memberID !== oldID) {
+    await Image.findOneAndUpdate(
+      { filename: `${oldID}.png` },
+      { filename: `${updateData.memberID}.png` }
+    );
   }
 
   res.status(200).json({

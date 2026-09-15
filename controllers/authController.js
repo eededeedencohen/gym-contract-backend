@@ -33,6 +33,45 @@ exports.login = catchAsync(async (req, res, next) => {
   });
 });
 
+// שינוי סיסמה (למנהל מחובר בלבד)
+exports.updatePassword = catchAsync(async (req, res, next) => {
+  const { currentPassword, newPassword } = req.body;
+
+  // 1. בדיקת קלט
+  if (!currentPassword || !newPassword) {
+    return next(new AppError("יש להזין סיסמה נוכחית וסיסמה חדשה", 400));
+  }
+  if (typeof newPassword !== "string" || newPassword.length < 6) {
+    return next(new AppError("הסיסמה החדשה חייבת להכיל לפחות 6 תווים", 400));
+  }
+  if (newPassword === currentPassword) {
+    return next(new AppError("הסיסמה החדשה חייבת להיות שונה מהנוכחית", 400));
+  }
+
+  // 2. שליפת המנהל מהטוקן
+  const admin = await Admin.findById(req.user.id).select("+password");
+  if (!admin) {
+    return next(new AppError("המשתמש לא נמצא", 401));
+  }
+
+  // 3. אימות הסיסמה הנוכחית
+  if (!(await admin.correctPassword(currentPassword, admin.password))) {
+    return next(new AppError("הסיסמה הנוכחית שגויה", 401));
+  }
+
+  // 4. שמירה (ה-pre-save hook מצפין את הסיסמה)
+  admin.password = newPassword;
+  await admin.save();
+
+  // 5. הנפקת טוקן חדש
+  const token = signToken(admin._id);
+  res.status(200).json({
+    status: "success",
+    message: "הסיסמה עודכנה בהצלחה",
+    token,
+  });
+});
+
 // Middleware להגנה על נתיבים
 exports.protect = catchAsync(async (req, res, next) => {
   let token;
