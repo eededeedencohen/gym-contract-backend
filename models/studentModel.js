@@ -8,6 +8,7 @@ const STUDENT_STATUSES = [
   "waiting", // ממתין
   "form_sent", // נשלח טופס לחתימה
   "signed", // חתום
+  "interested", // מעוניין
   "active", // מנוי בפרופיט
   "finished", // סיים מנוי בפרופיט
   "not_interested", // לא מעוניין

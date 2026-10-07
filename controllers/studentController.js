@@ -119,13 +119,14 @@ const syncSignedStudents = async () => {
 // Status workflow
 // ============================
 // שלב (אחד בלבד, אוטומטי):  waiting -> form_sent -> signed (קבוע)
-// מנוי (אחד לכל היותר, רק אחרי חתימה): active / finished / not_interested
-const MEMBERSHIP = ["active", "finished", "not_interested"];
+// מנוי (אחד לכל היותר, רק אחרי חתימה): interested / active / finished / not_interested
+const MEMBERSHIP = ["interested", "active", "finished", "not_interested"];
 const ALLOWED_MEMBERSHIP_TRANSITIONS = {
-  none: ["active", "not_interested"],
+  none: ["interested", "active", "not_interested"],
+  interested: ["interested", "active", "not_interested"],
   active: ["active", "finished", "not_interested"],
-  finished: ["finished", "active", "not_interested"],
-  not_interested: ["not_interested", "active", "finished"],
+  finished: ["finished", "interested", "active", "not_interested"],
+  not_interested: ["not_interested", "interested", "active", "finished"],
 };
 
 const isStudentSigned = (student) =>
