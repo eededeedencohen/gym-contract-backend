@@ -110,6 +110,7 @@ const morgan = require("morgan");
 const cors = require("cors");
 const productRouter = require("./routes/productRoutes");
 const gymRouter = require("./routes/gymRoutes");
+const studentRouter = require("./routes/studentRoutes");
 
 const app = express();
 
@@ -128,6 +129,7 @@ app.use(express.json({ limit: "50mb" }));
 // 2) API ROUTES (חייב לבוא לפני הסטטיק!)
 app.use("/api/v1/products", productRouter);
 app.use("/api/v1/gyms", gymRouter);
+app.use("/api/v1/students", studentRouter);
 
 // 3) SERVING STATIC FILES (Frontend & Uploads)
 // הגשת תמונות שהועלו

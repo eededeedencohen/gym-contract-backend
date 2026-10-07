@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
 const validator = require("validator");
+const { normalizePhone } = require("../utils/phone");
 
 const gymModelSchema = new mongoose.Schema(
   {
@@ -21,6 +22,12 @@ const gymModelSchema = new mongoose.Schema(
       trim: true,
       maxlength: [40, "A member ID must have less or equal then 40 characters"],
       minlength: [2, "A member ID must have more or equal then 2 characters"],
+    },
+    phone: {
+      type: String,
+      trim: true,
+      default: "",
+      set: normalizePhone,
     },
   },
   {

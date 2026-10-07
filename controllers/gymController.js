@@ -292,8 +292,11 @@
 const fs = require("fs"); // הוספתי את זה כי אתה משתמש בזה ב-insertAllGyms
 const Gym = require("../models/gymModel");
 const Image = require("../models/imageModel");
+const Student = require("../models/studentModel");
 const catchAsync = require("../utils/catchAsync");
 const APIfeatures = require("../utils/apiFeatures");
+const { normalizePhone } = require("../utils/phone");
+const { linkGymToStudent } = require("./studentController");
 
 // ========================
 // UPLOAD IMAGE HANDLER (MONGO VERSION)
@@ -401,8 +404,21 @@ exports.getGym = catchAsync(async (req, res, next) => {
 // ADD A NEW GYM
 //------------------------
 exports.createGym = catchAsync(async (req, res, next) => {
-  const newGym = await Gym.create(req.body);
+  const { memberName, memberID, phone } = req.body;
+  const newGym = await Gym.create({
+    memberName,
+    memberID,
+    phone: normalizePhone(phone),
+  });
   console.log("New gym created:", newGym);
+
+  // קישור החוזה לסטודנט (או יצירת סטודנט חדש בסטטוס "חתום").
+  // כישלון כאן לא אמור להכשיל את החתימה עצמה.
+  try {
+    await linkGymToStudent(newGym);
+  } catch (err) {
+    console.error("Failed to link contract to student:", err.message);
+  }
 
   res.status(201).json({
     status: "success",
@@ -423,6 +439,9 @@ exports.updateGym = catchAsync(async (req, res, next) => {
   }
   if (typeof req.body.memberID === "string") {
     updateData.memberID = req.body.memberID.trim();
+  }
+  if (typeof req.body.phone === "string") {
+    updateData.phone = normalizePhone(req.body.phone);
   }
 
   if (Object.keys(updateData).length === 0) {
@@ -463,6 +482,18 @@ exports.updateGym = catchAsync(async (req, res, next) => {
     );
   }
 
+  // עדכון הסטודנט המקושר (שם / טלפון) כדי שהרשימות יישארו עקביות
+  const studentUpdate = {};
+  if (updateData.memberName !== undefined) {
+    const parts = updateData.memberName.split(/\s+/).filter(Boolean);
+    studentUpdate.firstName = parts.shift() || "ללא שם";
+    studentUpdate.lastName = parts.join(" ");
+  }
+  if (updateData.phone !== undefined) studentUpdate.phone = updateData.phone;
+  if (Object.keys(studentUpdate).length) {
+    await Student.updateOne({ contractID: gym._id }, { $set: studentUpdate });
+  }
+
   res.status(200).json({
     status: "success",
     data: { gym },
@@ -486,6 +517,12 @@ exports.deleteGym = catchAsync(async (req, res, next) => {
       message: "No gym found with that ID",
     });
   }
+
+  // ניתוק הסטודנט מהחוזה שנמחק והסרת תגית "חתום"
+  await Student.updateOne(
+    { contractID: gym._id },
+    { $set: { contractID: null }, $pull: { statuses: "signed" } }
+  );
 
   res.status(204).json({
     status: "success",
