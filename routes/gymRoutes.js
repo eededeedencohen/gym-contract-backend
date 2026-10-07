@@ -159,7 +159,9 @@ router.use(authController.protect);
 // 3. PROTECTED ROUTES (רק למנהל)
 // ============================
 
-// שינוי סיסמת המנהל (חייב להיות לפני "/:id" כדי שלא ייתפס כ-ID)
+// פרטי המנהל / שינוי שם / שינוי סיסמה (חייבים להיות לפני "/:id" כדי שלא ייתפסו כ-ID)
+router.get("/me", authController.getMe);
+router.patch("/me", authController.updateMe);
 router.patch("/change-password", authController.updatePassword);
 
 // קבלת כל החוזים (רק מנהל צריך לראות את הרשימה)

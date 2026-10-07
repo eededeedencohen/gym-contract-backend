@@ -28,9 +28,9 @@ const markSigned = (student) => {
   student.statuses = keep;
 };
 
-// מוצא סטודנט מתאים לחוזה (לפי טלפון, ואם אין - לפי שם מלא) ומקשר אותו.
+// מוצא סטודנט מתאים לחוזה (לפי טוקן הזמנה, טלפון, ואם אין - לפי שם מלא) ומקשר אותו.
 // אם לא נמצא - יוצר סטודנט חדש בסטטוס "חתום".
-const linkGymToStudent = async (gym) => {
+const linkGymToStudent = async (gym, inviteToken = null) => {
   if (!gym) return null;
 
   // כבר מקושר?
@@ -40,7 +40,12 @@ const linkGymToStudent = async (gym) => {
   let student = null;
   const phone = normalizePhone(gym.phone);
 
-  if (phone) {
+  // 1. הקישור האישי שנשלח בוואטסאפ - הזיהוי הכי אמין
+  if (inviteToken) {
+    student = await Student.findOne({ inviteToken, contractID: null });
+  }
+
+  if (!student && phone) {
     student = await Student.findOne({ phone, contractID: null });
   }
 
@@ -76,6 +81,12 @@ const linkGymToStudent = async (gym) => {
 
 // סנכרון מלא: כל חוזה חתום מקבל סטודנט בסטטוס "חתום"; קישורים "תלויים" מנוקים.
 const syncSignedStudents = async () => {
+  // 0. השלמת טוקן הזמנה לסטודנטים ותיקים
+  const noToken = await Student.find({
+    $or: [{ inviteToken: { $exists: false } }, { inviteToken: null }],
+  });
+  for (const s of noToken) await s.save(); // ה-pre-save מייצר טוקן
+
   const gyms = await Gym.find().select("_id memberName phone");
   const gymIds = new Set(gyms.map((g) => String(g._id)));
 
@@ -85,9 +96,9 @@ const syncSignedStudents = async () => {
   );
   for (const s of linked) {
     if (!gymIds.has(String(s.contractID))) {
+      // החוזה נמחק - הסטודנט חוזר לתחילת התהליך
       s.contractID = null;
-      s.statuses = (s.statuses || []).filter((st) => st !== "signed");
-      if (s.statuses.length === 0) s.statuses = ["waiting"];
+      s.statuses = ["waiting"];
       await s.save();
     }
   }
@@ -104,7 +115,61 @@ const syncSignedStudents = async () => {
   }
 };
 
-// מסנן את גוף הבקשה לשדות המותרים בלבד
+// ============================
+// Status workflow
+// ============================
+// שלב (אחד בלבד, אוטומטי):  waiting -> form_sent -> signed (קבוע)
+// מנוי (אחד לכל היותר, רק אחרי חתימה): active / finished / not_interested
+const MEMBERSHIP = ["active", "finished", "not_interested"];
+const ALLOWED_MEMBERSHIP_TRANSITIONS = {
+  none: ["active", "not_interested"],
+  active: ["active", "finished", "not_interested"],
+  finished: ["finished", "active", "not_interested"],
+  not_interested: ["not_interested", "active", "finished"],
+};
+
+const isStudentSigned = (student) =>
+  Boolean(student && (student.contractID || (student.statuses || []).includes("signed")));
+
+const currentMembershipOf = (student) =>
+  (student?.statuses || []).find((s) => MEMBERSHIP.includes(s)) || null;
+
+// מחשב את מערך הסטטוסים החוקי לפי המצב הנוכחי והבקשה.
+// מחזיר { statuses } או { error }.
+const resolveStatuses = (current, requested) => {
+  const req = Array.isArray(requested)
+    ? [...new Set(requested)].filter((s) => STUDENT_STATUSES.includes(s))
+    : [];
+  const signed = isStudentSigned(current);
+
+  // שלב
+  let stage = "waiting";
+  if (signed) stage = "signed";
+  else if (req.includes("form_sent")) stage = "form_sent";
+  else if (req.includes("waiting") || req.length === 0) stage = "waiting";
+  else if ((current?.statuses || []).includes("form_sent")) stage = "form_sent";
+
+  // מנוי
+  const currentMembership = currentMembershipOf(current);
+  const requestedMembership = req.find((s) => MEMBERSHIP.includes(s)) || null;
+  let membership = requestedMembership || currentMembership; // אי אפשר "לנקות" מנוי
+
+  if (!signed) {
+    if (requestedMembership) {
+      return { error: "אפשר לסמן מנוי / לא מעוניין רק אחרי שהסטודנט חתם" };
+    }
+    membership = null;
+  } else if (membership !== currentMembership) {
+    const allowed = ALLOWED_MEMBERSHIP_TRANSITIONS[currentMembership || "none"];
+    if (!allowed.includes(membership)) {
+      return { error: "מעבר סטטוס לא חוקי" };
+    }
+  }
+
+  return { statuses: membership ? [stage, membership] : [stage] };
+};
+
+// מסנן את גוף הבקשה לשדות המותרים בלבד (ללא סטטוסים - הם מטופלים בנפרד)
 const pickStudentFields = (body) => {
   const data = {};
   if (typeof body.firstName === "string") data.firstName = body.firstName.trim();
@@ -112,12 +177,6 @@ const pickStudentFields = (body) => {
   if (typeof body.phone === "string") data.phone = normalizePhone(body.phone);
   if (typeof body.gender === "string" && GENDERS.includes(body.gender)) {
     data.gender = body.gender;
-  }
-  if (Array.isArray(body.statuses)) {
-    const clean = [...new Set(body.statuses)].filter((s) =>
-      STUDENT_STATUSES.includes(s)
-    );
-    data.statuses = clean.length ? clean : ["waiting"];
   }
   return data;
 };
@@ -137,6 +196,29 @@ const populateContract = (query) =>
 // ============================
 // Handlers
 // ============================
+
+// ציבורי: פרטי מילוי-מראש לטופס לפי טוקן הזמנה (מחזיר רק מה שהטופס צריך)
+exports.getInvite = catchAsync(async (req, res, next) => {
+  const token = String(req.params.token || "");
+  if (!/^[a-f0-9]{32}$/.test(token)) {
+    return next(new AppError("קישור לא תקין", 404));
+  }
+  const student = await Student.findOne({ inviteToken: token }).select(
+    "firstName lastName phone contractID"
+  );
+  if (!student) return next(new AppError("קישור לא תקין", 404));
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      invite: {
+        fullName: `${student.firstName} ${student.lastName}`.trim(),
+        phone: student.phone || "",
+        alreadySigned: Boolean(student.contractID),
+      },
+    },
+  });
+});
 
 exports.getAllStudents = catchAsync(async (req, res, next) => {
   // מוודאים שכל מי שחתם מופיע כ"חתום"
@@ -158,6 +240,9 @@ exports.createStudent = catchAsync(async (req, res, next) => {
   const err = validateStudentData(data);
   if (err) return next(new AppError(err, 400));
 
+  // סטודנט חדש תמיד מתחיל ב"ממתין"
+  data.statuses = ["waiting"];
+
   const created = await Student.create(data);
   const student = await populateContract(Student.findById(created._id));
 
@@ -169,7 +254,8 @@ exports.createStudent = catchAsync(async (req, res, next) => {
 
 exports.updateStudent = catchAsync(async (req, res, next) => {
   const data = pickStudentFields(req.body);
-  if (Object.keys(data).length === 0) {
+  const hasStatuses = Array.isArray(req.body.statuses);
+  if (Object.keys(data).length === 0 && !hasStatuses) {
     return next(new AppError("אין שדות לעדכון", 400));
   }
   const err = validateStudentData(data, { partial: true });
@@ -177,6 +263,12 @@ exports.updateStudent = catchAsync(async (req, res, next) => {
 
   const student = await Student.findById(req.params.id);
   if (!student) return next(new AppError("הסטודנט לא נמצא", 404));
+
+  if (hasStatuses) {
+    const resolved = resolveStatuses(student, req.body.statuses);
+    if (resolved.error) return next(new AppError(resolved.error, 400));
+    data.statuses = resolved.statuses;
+  }
 
   Object.assign(student, data);
   await student.save();

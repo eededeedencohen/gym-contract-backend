@@ -1,5 +1,6 @@
 // models/studentModel.js
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 const { normalizePhone, isValidPhone } = require("../utils/phone");
 
 // סטטוסים (תגיות) - אפשר יותר מאחד לכל סטודנט
@@ -54,6 +55,12 @@ const studentSchema = new mongoose.Schema(
       ref: "Gym",
       default: null,
     },
+    // טוקן אקראי לקישור החתימה האישי (במקום שם/טלפון גלויים ב-URL)
+    inviteToken: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
   },
   {
     timestamps: true,
@@ -64,6 +71,17 @@ const studentSchema = new mongoose.Schema(
 
 studentSchema.index({ phone: 1 });
 studentSchema.index({ contractID: 1 });
+
+studentSchema.statics.generateInviteToken = () =>
+  crypto.randomBytes(16).toString("hex");
+
+// כל סטודנט מקבל טוקן הזמנה אוטומטית
+studentSchema.pre("save", function (next) {
+  if (!this.inviteToken) {
+    this.inviteToken = this.constructor.generateInviteToken();
+  }
+  next();
+});
 
 studentSchema.virtual("fullName").get(function () {
   return `${this.firstName || ""} ${this.lastName || ""}`.trim();

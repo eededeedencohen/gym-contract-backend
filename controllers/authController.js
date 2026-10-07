@@ -30,6 +30,39 @@ exports.login = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     token,
+    admin: { username: admin.username, displayName: admin.displayName },
+  });
+});
+
+// פרטי המנהל המחובר
+exports.getMe = catchAsync(async (req, res, next) => {
+  const admin = await Admin.findById(req.user.id);
+  if (!admin) return next(new AppError("המשתמש לא נמצא", 401));
+  res.status(200).json({
+    status: "success",
+    data: { admin: { username: admin.username, displayName: admin.displayName } },
+  });
+});
+
+// עדכון שם התצוגה
+exports.updateMe = catchAsync(async (req, res, next) => {
+  const displayName = String(req.body.displayName || "").trim();
+  if (displayName.length < 2) {
+    return next(new AppError("יש להזין שם (לפחות 2 תווים)", 400));
+  }
+  if (displayName.length > 40) {
+    return next(new AppError("השם ארוך מדי", 400));
+  }
+
+  const admin = await Admin.findById(req.user.id).select("+password");
+  if (!admin) return next(new AppError("המשתמש לא נמצא", 401));
+
+  admin.displayName = displayName;
+  await admin.save(); // הסיסמה לא השתנתה ולכן לא תוצפן מחדש
+
+  res.status(200).json({
+    status: "success",
+    data: { admin: { username: admin.username, displayName: admin.displayName } },
   });
 });
 

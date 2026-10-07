@@ -404,7 +404,7 @@ exports.getGym = catchAsync(async (req, res, next) => {
 // ADD A NEW GYM
 //------------------------
 exports.createGym = catchAsync(async (req, res, next) => {
-  const { memberName, memberID, phone } = req.body;
+  const { memberName, memberID, phone, inviteToken } = req.body;
   const newGym = await Gym.create({
     memberName,
     memberID,
@@ -415,7 +415,10 @@ exports.createGym = catchAsync(async (req, res, next) => {
   // קישור החוזה לסטודנט (או יצירת סטודנט חדש בסטטוס "חתום").
   // כישלון כאן לא אמור להכשיל את החתימה עצמה.
   try {
-    await linkGymToStudent(newGym);
+    await linkGymToStudent(
+      newGym,
+      typeof inviteToken === "string" ? inviteToken : null
+    );
   } catch (err) {
     console.error("Failed to link contract to student:", err.message);
   }
@@ -518,10 +521,10 @@ exports.deleteGym = catchAsync(async (req, res, next) => {
     });
   }
 
-  // ניתוק הסטודנט מהחוזה שנמחק והסרת תגית "חתום"
+  // ניתוק הסטודנט מהחוזה שנמחק - חוזר לתחילת התהליך ("ממתין")
   await Student.updateOne(
     { contractID: gym._id },
-    { $set: { contractID: null }, $pull: { statuses: "signed" } }
+    { $set: { contractID: null, statuses: ["waiting"] } }
   );
 
   res.status(204).json({

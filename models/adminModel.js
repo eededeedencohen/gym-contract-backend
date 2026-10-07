@@ -5,6 +5,13 @@ const bcrypt = require("bcryptjs");
 const adminSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  // שם תצוגה - מופיע בממשק ובניסוח הודעות הוואטסאפ
+  displayName: {
+    type: String,
+    trim: true,
+    default: "שמרית",
+    maxlength: [40, "השם ארוך מדי"],
+  },
 });
 
 // הצפנת הסיסמה לפני שמירה

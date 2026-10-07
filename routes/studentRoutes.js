@@ -6,11 +6,15 @@ const {
   createStudent,
   updateStudent,
   deleteStudent,
+  getInvite,
 } = require("../controllers/studentController");
 
 const router = express.Router();
 
-// כל נתיבי הסטודנטים מיועדים למנהל בלבד
+// ציבורי: מילוי-מראש של טופס החתימה לפי טוקן הזמנה אישי
+router.get("/invite/:token", getInvite);
+
+// שאר נתיבי הסטודנטים מיועדים למנהל בלבד
 router.use(authController.protect);
 
 router.route("/").get(getAllStudents).post(createStudent);
