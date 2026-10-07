@@ -2,6 +2,7 @@
 const Student = require("../models/studentModel");
 const { STUDENT_STATUSES, GENDERS } = require("../models/studentModel");
 const Gym = require("../models/gymModel");
+const Image = require("../models/imageModel");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const { normalizePhone, isValidPhone } = require("../utils/phone");
@@ -293,9 +294,24 @@ exports.updateStudent = catchAsync(async (req, res, next) => {
   });
 });
 
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 exports.deleteStudent = catchAsync(async (req, res, next) => {
-  const student = await Student.findByIdAndDelete(req.params.id);
+  const student = await Student.findById(req.params.id);
   if (!student) return next(new AppError("הסטודנט לא נמצא", 404));
+
+  // סטודנט חתום = האדם שמאחורי החוזה. מוחקים גם את החוזה והחתימה,
+  // אחרת הסנכרון ייצור אותו מחדש מהחוזה.
+  if (student.contractID) {
+    const gym = await Gym.findByIdAndDelete(student.contractID);
+    if (gym?.memberID) {
+      await Image.deleteMany({
+        filename: { $regex: new RegExp(`^${escapeRegex(gym.memberID)}`) },
+      });
+    }
+  }
+
+  await student.deleteOne();
 
   res.status(204).json({ status: "success", data: null });
 });
